@@ -86,14 +86,23 @@ async function chat(prompt, maxTokens = 1500, retries = 3) {
 }
 
 /**
- * Strip markdown code fences from LLM JSON responses
+ * Strip markdown code fences and trailing text from LLM JSON responses.
+ * Some models append explanatory text after the closing brace/bracket.
  */
 function extractJSON(raw) {
-  return raw
+  let cleaned = raw
     .replace(/^```json\s*/i, '')
     .replace(/^```\s*/i, '')
     .replace(/```\s*$/i, '')
     .trim();
+
+  // Trim any trailing text after the last } or ]
+  const lastBrace = Math.max(cleaned.lastIndexOf('}'), cleaned.lastIndexOf(']'));
+  if (lastBrace !== -1 && lastBrace < cleaned.length - 1) {
+    cleaned = cleaned.substring(0, lastBrace + 1);
+  }
+
+  return cleaned;
 }
 
 module.exports = { chat, extractJSON };

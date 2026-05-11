@@ -55,7 +55,7 @@ Return a JSON object:
 
 Return ONLY the JSON object, no other text.`;
 
-  const response = await chat(prompt, 1200);
+  const response = await chat(prompt, 2000);
   const jsonStr = extractJSON(response);
 
   try {
