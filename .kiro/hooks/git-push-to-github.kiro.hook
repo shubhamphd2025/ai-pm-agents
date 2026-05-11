@@ -1,0 +1,14 @@
+{
+  "enabled": true,
+  "name": "Push to GitHub",
+  "description": "Stages all changes, creates a commit with a timestamped message, and pushes to the main branch on GitHub. Trigger this manually whenever you want to save and push your work.",
+  "version": "1",
+  "when": {
+    "type": "userTriggered"
+  },
+  "then": {
+    "type": "runCommand",
+    "command": "git add . && git commit -m \"chore: update $(date '+%Y-%m-%d %H:%M')\" && git push -u origin main",
+    "timeout": 60
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "name": "pm-discovery",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "analyze": "node index.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "app-store-scraper": "^0.18.0",
+    "axios": "^1.16.0",
+    "dotenv": "^17.4.2",
+    "google-play-scraper": "^10.1.2",
+    "openai": "^6.37.0"
+  }
+}
