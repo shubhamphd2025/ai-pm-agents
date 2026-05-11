@@ -44,7 +44,7 @@ async function getAppDetails(appId) {
     description: details.description,
     summary: details.description?.substring(0, 200),
     score: details.score,
-    ratings: details.ratings,
+    ratings: details.reviews,  // App Store uses 'reviews' for the rating count
     reviews: details.reviews,
     price: details.price,
     free: details.free,
