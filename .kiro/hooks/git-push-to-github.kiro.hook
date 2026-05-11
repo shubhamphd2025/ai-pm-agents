@@ -8,7 +8,7 @@
   },
   "then": {
     "type": "runCommand",
-    "command": "git add . && git commit -m \"chore: update $(date '+%Y-%m-%d %H:%M')\" && git push -u origin main",
+    "command": "git add . && git commit -m \"chore: update $(date '+%Y-%m-%d %H:%M')\" && git push -u origin master",
     "timeout": 60
   }
 }
