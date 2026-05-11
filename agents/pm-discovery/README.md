@@ -43,3 +43,6 @@ Cost: ~$0.006 per full run. Fallback chain: Mistral Nemo → Qwen3 14B → Mistr
 ## Troubleshooting
 
 See [GUIDE.md — Troubleshooting](../../GUIDE.md#6-troubleshooting).
+
+xyz
+
