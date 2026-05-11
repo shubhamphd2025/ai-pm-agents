@@ -56,16 +56,16 @@ function buildPageContent(analysisData) {
 
   // ── HEADER ──────────────────────────────────────────────────────────────────
   let content = `
-<h1>🔍 App Discovery Analysis: ${targetApp.name}</h1>
-<p><em>Generated on ${new Date(generatedAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })} by Assistant PM — Discovery Agent</em></p>
+<h1>App Discovery: ${targetApp.name}</h1>
+<p><em>Generated ${new Date(generatedAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })} by Assistant PM — Discovery</em></p>
 <hr/>
 
-<h2>📋 Executive Summary</h2>
+<h2>Executive Summary</h2>
 <p>${targetApp.executiveSummary || 'Analysis complete. See sections below for detailed findings.'}</p>
 
 <hr/>
 
-<h2>📱 App Overview</h2>
+<h2>App Overview</h2>
 `;
 
   // ── APP METADATA TABLE ───────────────────────────────────────────────────────
@@ -121,7 +121,7 @@ function buildPageContent(analysisData) {
 `;
 
   // ── SENTIMENT ANALYSIS ───────────────────────────────────────────────────────
-  content += `<h2>💬 User Sentiment Analysis</h2>`;
+  content += `<h2>User Sentiment</h2>`;
 
   for (const app of allApps) {
     const sentiment = app.sentiment;
@@ -129,15 +129,15 @@ function buildPageContent(analysisData) {
 
     content += `
 <h3>${app.name}</h3>
-<p><strong>Overall Sentiment:</strong> ${sentiment.overallSentiment || 'N/A'} &nbsp;|&nbsp; <strong>Happiness Score:</strong> ${sentiment.sentimentScore || 'N/A'}/10</p>
+<p><strong>Sentiment:</strong> ${sentiment.overallSentiment || 'N/A'} &nbsp;|&nbsp; <strong>Score:</strong> ${sentiment.sentimentScore || 'N/A'}/10</p>
 
 <table>
   <thead>
     <tr>
-      <th>❤️ What Users Love</th>
-      <th>😤 What Users Hate</th>
-      <th>🙏 Feature Requests</th>
-      <th>🐛 Reported Bugs</th>
+      <th>What Users Love</th>
+      <th>What Users Hate</th>
+      <th>Feature Requests</th>
+      <th>Reported Bugs</th>
     </tr>
   </thead>
   <tbody>
@@ -161,7 +161,7 @@ function buildPageContent(analysisData) {
   content += `<hr/>`;
 
   // ── RATING DISTRIBUTION ──────────────────────────────────────────────────────
-  content += `<h2>⭐ Rating Distribution</h2>`;
+  content += `<h2>Rating Distribution</h2>`;
 
   for (const app of allApps) {
     const iosHist = app.ios?.ratingDistribution;
@@ -193,7 +193,7 @@ function buildPageContent(analysisData) {
   content += `<hr/>`;
 
   // ── FEATURE COMPARISON ───────────────────────────────────────────────────────
-  content += `<h2>🔧 Feature Comparison</h2>`;
+  content += `<h2>Feature Comparison</h2>`;
 
   if (allApps[0]?.features && allApps[0].features.length > 0) {
     // Build feature matrix
@@ -220,7 +220,7 @@ function buildPageContent(analysisData) {
 
   // ── FEATURE GAPS ────────────────────────────────────────────────────────────
   if (featureGaps) {
-    content += `<h3>🚨 Feature Gaps (${targetApp.name} is missing)</h3>`;
+    content += `<h3>Feature Gaps (missing from ${targetApp.name})</h3>`;
 
     if (featureGaps.gaps && featureGaps.gaps.length > 0) {
       content += `<table><thead><tr><th>Missing Feature</th><th>Present In</th><th>Impact</th><th>Why It Matters</th></tr></thead><tbody>`;
@@ -237,7 +237,7 @@ function buildPageContent(analysisData) {
     }
 
     if (featureGaps.uniqueToTarget && featureGaps.uniqueToTarget.length > 0) {
-      content += `<h3>💎 Unique Advantages of ${targetApp.name}</h3><ul>`;
+      content += `<h3>Unique Advantages of ${targetApp.name}</h3><ul>`;
       for (const u of featureGaps.uniqueToTarget) {
         content += `<li><strong>${u.feature}</strong>: ${u.advantage}</li>`;
       }
@@ -248,7 +248,7 @@ function buildPageContent(analysisData) {
   content += `<hr/>`;
 
   // ── ASO ANALYSIS ────────────────────────────────────────────────────────────
-  content += `<h2>🔑 ASO & Keyword Analysis</h2>`;
+  content += `<h2>ASO & Keyword Analysis</h2>`;
 
   if (asoAnalysis) {
     content += `
@@ -310,7 +310,7 @@ function buildPageContent(analysisData) {
   // ── STRATEGIC RECOMMENDATIONS ────────────────────────────────────────────────
   if (targetApp.strategicRecommendations) {
     content += `
-<h2>🎯 Strategic Recommendations</h2>
+<h2>Strategic Recommendations</h2>
 <ul>
   ${targetApp.strategicRecommendations.map((r) => `<li>${r}</li>`).join('')}
 </ul>
@@ -320,7 +320,7 @@ function buildPageContent(analysisData) {
 
   // ── FOOTER ───────────────────────────────────────────────────────────────────
   content += `
-<p><em>📊 Data sourced from Google Play Store and Apple App Store &nbsp;|&nbsp; 🤖 Analysis by Assistant PM — Discovery Agent &nbsp;|&nbsp; Generated: ${new Date(generatedAt).toISOString()}</em></p>
+<p><em>Data sourced from Google Play Store and Apple App Store. Generated: ${new Date(generatedAt).toISOString()}</em></p>
 `;
 
   return content;

@@ -1,7 +1,7 @@
 /**
  * Shared LLM client
- * Uses OpenRouter with DeepSeek V3 (free tier) by default
- * OpenRouter is OpenAI-API-compatible, so the openai SDK works directly
+ * Uses OpenRouter (OpenAI-compatible API) with DeepSeek V4 Flash by default
+ * Falls back through a chain of models on rate limit or provider errors
  */
 
 const OpenAI = require('openai');

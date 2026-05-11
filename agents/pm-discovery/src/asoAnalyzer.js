@@ -109,7 +109,7 @@ Return ONLY the JSON object, no other text.`;
   try {
     return JSON.parse(jsonStr);
   } catch (e) {
-    console.error('[ASO Compare] Failed to parse LLM response:', raw);
+    console.error('[ASO Compare] Failed to parse LLM response:', jsonStr);
     return null;
   }
 }

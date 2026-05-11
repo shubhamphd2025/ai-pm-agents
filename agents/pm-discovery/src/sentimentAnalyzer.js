@@ -1,7 +1,6 @@
 /**
  * Sentiment Analysis module
  * Processes reviews to extract themes, sentiment, and feature requests
- * Uses Claude (via Kiro's LLM context) for synthesis
  */
 
 const { chat, extractJSON } = require('./llmClient');
@@ -97,7 +96,7 @@ Return ONLY the JSON object, no other text.`;
   try {
     return JSON.parse(jsonStr);
   } catch (e) {
-    console.error('[Sentiment] Failed to parse LLM response:', raw);
+    console.error('[Sentiment] Failed to parse LLM response:', jsonStr);
     return {
       loves: ['Analysis parsing failed'],
       hates: ['Analysis parsing failed'],

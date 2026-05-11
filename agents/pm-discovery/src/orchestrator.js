@@ -1,6 +1,6 @@
 /**
- * Orchestrator — the brain of the PM Discovery Agent
- * Coordinates all modules: scraping → analysis → publishing
+ * Orchestrator
+ * Coordinates the full discovery pipeline: scraping, analysis, publishing
  */
 
 const { chat, extractJSON } = require('./llmClient');
@@ -13,11 +13,11 @@ const { analyzeASO, compareASO } = require('./asoAnalyzer');
 const { publishToConfluence } = require('./confluencePublisher');
 
 /**
- * Pull data for a single app from both stores
- * Gracefully handles failures on either platform
+ * Pull data for a single app from both stores in parallel.
+ * Succeeds as long as at least one store returns data.
  */
 async function pullBothStores(appName) {
-  console.log(`\n📦 Pulling data for: ${appName}`);
+  console.log(`[orchestrator] Pulling data for: ${appName}`);
 
   const [iosResult, androidResult] = await Promise.allSettled([
     pullAppStore(appName),
@@ -28,10 +28,10 @@ async function pullBothStores(appName) {
   const android = androidResult.status === 'fulfilled' ? androidResult.value : null;
 
   if (iosResult.status === 'rejected') {
-    console.warn(`  ⚠️  App Store failed for "${appName}": ${iosResult.reason?.message}`);
+    console.warn(`[orchestrator] App Store failed for "${appName}": ${iosResult.reason?.message}`);
   }
   if (androidResult.status === 'rejected') {
-    console.warn(`  ⚠️  Play Store failed for "${appName}": ${androidResult.reason?.message}`);
+    console.warn(`[orchestrator] Play Store failed for "${appName}": ${androidResult.reason?.message}`);
   }
 
   if (!ios && !android) {
@@ -42,31 +42,24 @@ async function pullBothStores(appName) {
 }
 
 /**
- * Run full analysis for a single app
+ * Run sentiment analysis, feature extraction, and rating distribution for one app.
  */
 async function analyzeApp(appName, storeData) {
   const { ios, android } = storeData;
 
-  console.log(`  🔬 Analyzing: ${appName}`);
+  console.log(`[orchestrator] Analyzing: ${appName}`);
 
-  // Combine reviews from both platforms
   const allReviews = [
     ...(ios?.reviews || []),
     ...(android?.reviews || []),
   ];
 
-  // Run sentiment analysis
-  const sentiment = await analyzeSentiment(
-    appName,
-    [ios ? 'iOS' : '', android ? 'Android' : ''].filter(Boolean).join(' & '),
-    allReviews
-  );
+  const platforms = [ios ? 'iOS' : '', android ? 'Android' : ''].filter(Boolean).join(' & ');
+  const sentiment = await analyzeSentiment(appName, platforms, allReviews);
 
-  // Extract features
   const description = ios?.details?.description || android?.details?.description || '';
   const features = await extractFeatures(appName, description, allReviews);
 
-  // Compute rating distributions
   const iosRatingDist = ios ? computeRatingDistribution(ios.details.histogram) : null;
   const androidRatingDist = android ? computeRatingDistribution(android.details.histogram) : null;
 
@@ -82,7 +75,7 @@ async function analyzeApp(appName, storeData) {
 }
 
 /**
- * Generate executive summary using LLM
+ * Generate a 3-4 sentence executive summary for the discovery document.
  */
 async function generateExecutiveSummary(targetApp, competitors, featureGaps) {
   const competitorNames = competitors.map((c) => c.name).join(', ');
@@ -109,20 +102,20 @@ Write for a product manager audience. Be direct and insightful. No fluff.`;
 }
 
 /**
- * Generate strategic recommendations
+ * Generate 5-7 actionable strategic recommendations grounded in the analysis data.
  */
 async function generateRecommendations(targetApp, featureGaps, asoAnalysis) {
   const prompt = `You are a senior product manager. Based on this analysis of "${targetApp.name}", provide 5-7 strategic recommendations.
 
-**Sentiment Insights:**
+Sentiment:
 - Users love: ${(targetApp.sentiment?.loves || []).slice(0, 3).join('; ')}
 - Users hate: ${(targetApp.sentiment?.hates || []).slice(0, 3).join('; ')}
 - Top requests: ${(targetApp.sentiment?.featureRequests || []).slice(0, 3).join('; ')}
 
-**Feature Gaps (High Impact):**
+High-impact feature gaps:
 ${(featureGaps?.gaps || []).filter((g) => g.impact === 'High').map((g) => `- ${g.feature}: ${g.reasoning}`).join('\n') || 'None'}
 
-**ASO Quick Wins:**
+ASO quick wins:
 ${(asoAnalysis?.quickWins || []).slice(0, 3).join('\n') || 'None'}
 
 Return a JSON array of 5-7 recommendation strings. Each should be actionable and specific.
@@ -136,28 +129,31 @@ Return ONLY the JSON array, no other text.`;
   try {
     return JSON.parse(jsonStr);
   } catch (e) {
+    console.warn('[orchestrator] Could not parse recommendations, using fallback');
     return ['See detailed analysis sections above for recommendations.'];
   }
 }
 
 /**
- * Main entry point — run the full discovery analysis
+ * Run the full discovery analysis pipeline.
  *
  * @param {string} targetAppName - The primary app to analyze
- * @param {string[]} competitorNames - Optional list of competitor app names
+ * @param {string[]} competitorNames - Competitor app names (auto-discovered if empty)
  * @param {string} confluenceParentPageId - Confluence page ID to publish under
  */
 async function runDiscovery({ targetAppName, competitorNames = [], confluenceParentPageId }) {
-  console.log(`\n🚀 Starting PM Discovery Analysis`);
-  console.log(`   Target: ${targetAppName}`);
-  console.log(`   Competitors provided: ${competitorNames.length > 0 ? competitorNames.join(', ') : 'Auto-discover'}`);
-  console.log(`   Confluence Parent: ${confluenceParentPageId}\n`);
+  if (!targetAppName || !targetAppName.trim()) {
+    throw new Error('targetAppName is required');
+  }
 
-  // ── STEP 1: Pull target app data ─────────────────────────────────────────────
+  console.log(`[orchestrator] Starting discovery: ${targetAppName}`);
+  console.log(`[orchestrator] Competitors: ${competitorNames.length > 0 ? competitorNames.join(', ') : 'auto-discover'}`);
+
+  // Step 1: Pull target app data
   const targetStoreData = await pullBothStores(targetAppName);
   const targetAnalysis = await analyzeApp(targetAppName, targetStoreData);
 
-  // ── STEP 2: Discover competitors if not provided ─────────────────────────────
+  // Step 2: Resolve competitor list
   const similarApps = [
     ...(targetStoreData.ios?.similar || []),
     ...(targetStoreData.android?.similar || []),
@@ -166,39 +162,36 @@ async function runDiscovery({ targetAppName, competitorNames = [], confluencePar
   let finalCompetitorNames = competitorNames;
 
   if (competitorNames.length === 0) {
-    console.log(`\n🔍 Auto-discovering competitors...`);
+    console.log('[orchestrator] Auto-discovering competitors...');
     const category = targetStoreData.ios?.details?.primaryGenre || targetStoreData.android?.details?.genre || 'App';
     try {
       const discovered = await findCompetitors(targetAppName, category, similarApps, 3);
       finalCompetitorNames = discovered.map((c) => c.name);
-      console.log(`   Found: ${finalCompetitorNames.join(', ')}`);
+      console.log(`[orchestrator] Discovered: ${finalCompetitorNames.join(', ')}`);
     } catch (err) {
-      console.warn(`  ⚠️  Competitor auto-discovery failed: ${err.message}`);
-      // Fall back to store-provided similar apps
+      console.warn(`[orchestrator] Competitor auto-discovery failed: ${err.message}`);
       finalCompetitorNames = similarApps.slice(0, 3).map((a) => a.title || a.name).filter(Boolean);
-      console.log(`   Using store suggestions: ${finalCompetitorNames.join(', ') || 'none'}`);
+      console.log(`[orchestrator] Using store suggestions: ${finalCompetitorNames.join(', ') || 'none'}`);
     }
   } else {
     finalCompetitorNames = mergeCompetitors(competitorNames, [], 4);
   }
 
-  // ── STEP 3: Pull and analyze competitor data ─────────────────────────────────
+  // Step 3: Pull and analyze competitor data
   const competitorAnalyses = [];
-
   for (const compName of finalCompetitorNames) {
     try {
       const compStoreData = await pullBothStores(compName);
       const compAnalysis = await analyzeApp(compName, compStoreData);
       competitorAnalyses.push(compAnalysis);
     } catch (err) {
-      console.warn(`  ⚠️  Skipping competitor "${compName}": ${err.message}`);
+      console.warn(`[orchestrator] Skipping competitor "${compName}": ${err.message}`);
     }
   }
 
-  // ── STEP 4: Feature gap analysis ─────────────────────────────────────────────
-  console.log(`\n🔧 Running feature gap analysis...`);
+  // Step 4: Feature gap analysis
+  console.log('[orchestrator] Running feature gap analysis...');
   let featureGaps = null;
-
   if (competitorAnalyses.length > 0) {
     featureGaps = await compareFeatures(
       { name: targetAppName, features: targetAnalysis.features },
@@ -206,8 +199,8 @@ async function runDiscovery({ targetAppName, competitorNames = [], confluencePar
     );
   }
 
-  // ── STEP 5: ASO analysis ─────────────────────────────────────────────────────
-  console.log(`\n🔑 Running ASO analysis...`);
+  // Step 5: ASO analysis
+  console.log('[orchestrator] Running ASO analysis...');
   const asoAnalysis = await analyzeASO(targetStoreData);
 
   let asoComparison = null;
@@ -219,15 +212,16 @@ async function runDiscovery({ targetAppName, competitorNames = [], confluencePar
     asoComparison = await compareASO(allAppsForASO);
   }
 
-  // ── STEP 6: Generate executive summary & recommendations ─────────────────────
-  console.log(`\n✍️  Generating executive summary and recommendations...`);
+  // Step 6: Executive summary and recommendations
+  console.log('[orchestrator] Generating summary and recommendations...');
   const executiveSummary = await generateExecutiveSummary(targetAnalysis, competitorAnalyses, featureGaps);
   const strategicRecommendations = await generateRecommendations(targetAnalysis, featureGaps, asoAnalysis);
 
   targetAnalysis.executiveSummary = executiveSummary;
   targetAnalysis.strategicRecommendations = strategicRecommendations;
 
-  // ── STEP 7: Assemble final analysis object ───────────────────────────────────
+  // Step 7: Publish to Confluence
+  console.log('[orchestrator] Publishing to Confluence...');
   const analysisData = {
     targetApp: targetAnalysis,
     competitors: competitorAnalyses,
@@ -237,12 +231,9 @@ async function runDiscovery({ targetAppName, competitorNames = [], confluencePar
     generatedAt: new Date().toISOString(),
   };
 
-  // ── STEP 8: Publish to Confluence ────────────────────────────────────────────
-  console.log(`\n📄 Publishing to Confluence...`);
   const page = await publishToConfluence(analysisData, confluenceParentPageId);
 
-  console.log(`\n✅ Analysis complete!`);
-  console.log(`   📄 Confluence page: ${page.url || page._links?.webui || 'Published'}`);
+  console.log(`[orchestrator] Done. Confluence: ${page._links?.webui || page.url || 'published'}`);
 
   return { analysisData, confluencePage: page };
 }

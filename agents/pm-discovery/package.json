@@ -1,16 +1,23 @@
 {
   "name": "pm-discovery",
   "version": "1.0.0",
-  "description": "",
+  "description": "Analyzes mobile apps from the App Store and Play Store, then publishes a discovery document to Confluence",
   "main": "index.js",
   "scripts": {
     "analyze": "node index.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"No automated test runner configured. See TESTING.md for manual test instructions.\""
   },
-  "keywords": [],
-  "author": "",
+  "keywords": ["product-management", "app-store", "play-store", "confluence", "discovery"],
+  "author": "Shubham Mishra",
   "license": "ISC",
   "type": "commonjs",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/shubhamphd2025/ai-pm-agents"
+  },
   "dependencies": {
     "app-store-scraper": "^0.18.0",
     "axios": "^1.16.0",

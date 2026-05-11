@@ -41,7 +41,7 @@ Return ONLY the JSON array, no other text.`;
   try {
     return JSON.parse(jsonStr);
   } catch (e) {
-    console.error('[Competitors] Failed to parse LLM response:', raw);
+    console.error('[Competitors] Failed to parse LLM response:', jsonStr);
     // Fall back to similar apps from store
     return similarNames.slice(0, maxCompetitors).map((name) => ({
       name,

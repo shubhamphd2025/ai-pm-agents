@@ -1,31 +1,30 @@
-# ── Secrets — NEVER commit these ─────────────────────────────────────────────
+# Secrets
 .env
 *.env
 .env.local
 .env.*.local
 
-# ── Node ─────────────────────────────────────────────────────────────────────
+# Node
 node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-package-lock.json
 
-# ── Agent outputs ─────────────────────────────────────────────────────────────
+# Agent outputs
 agents/pm-discovery/outputs/
 
-# ── macOS ─────────────────────────────────────────────────────────────────────
+# macOS
 .DS_Store
 .AppleDouble
 .LSOverride
 ._*
 
-# ── Editor ────────────────────────────────────────────────────────────────────
+# Editor
 .vscode/
 .idea/
 *.swp
 *.swo
 
-# ── Logs ─────────────────────────────────────────────────────────────────────
+# Logs
 logs/
 *.log

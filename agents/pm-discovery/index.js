@@ -47,8 +47,8 @@ function validateEnv() {
   const missing = required.filter((key) => !process.env[key]);
 
   if (missing.length > 0) {
-    console.error(`\n❌ Missing required environment variables:\n   ${missing.join('\n   ')}`);
-    console.error(`\n   Copy .env.example to .env and fill in the values.\n`);
+    console.error(`\nMissing required environment variables:\n  ${missing.join('\n  ')}`);
+    console.error(`\nCopy .env.example to .env and fill in the values.\n`);
     process.exit(1);
   }
 }
@@ -59,8 +59,8 @@ async function main() {
 
   const args = parseArgs();
 
-  if (!args.app) {
-    console.error(`\n❌ Usage: node index.js --app "App Name" [--competitors "App1,App2"]\n`);
+  if (!args.app || !args.app.trim()) {
+    console.error(`\nUsage: node index.js --app "App Name" [--competitors "App1,App2"]\n`);
     process.exit(1);
   }
 
@@ -71,8 +71,8 @@ async function main() {
       confluenceParentPageId: args.parentPageId || process.env.CONFLUENCE_PARENT_PAGE_ID,
     });
   } catch (err) {
-    console.error(`\n❌ Analysis failed: ${err.message}`);
-    if (process.env.DEBUG) console.error(err.stack);
+    console.error(`\nAnalysis failed: ${err.message}`);
+    if (process.env.DEBUG === 'true') console.error(err.stack);
     process.exit(1);
   }
 }

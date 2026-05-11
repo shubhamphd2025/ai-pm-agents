@@ -1,9 +1,8 @@
 # Testing Performed — Assistant PM Discovery Agent
 
-**Tested on:** May 11, 2026  
-**Tested by:** Kiro AI (automated)  
-**Environment:** macOS, Node.js v24.11.0  
-**Agent version:** Initial release (commit `755d8ba`)
+**Tested on:** May 11, 2026
+**Environment:** macOS, Node.js v24.11.0
+**Agent version:** commit `755d8ba`
 
 ---
 
@@ -25,7 +24,7 @@
 | End-to-End | 1 | 1 | 0 |
 | **Total** | **32** | **32** | **0** |
 
-**Result: ✅ All 32 tests passed**
+**Result: All 32 tests passed**
 
 ---
 
@@ -276,26 +275,3 @@ LLM:          DeepSeek V4 Flash via OpenRouter
 Confluence:   shubhamentain.atlassian.net
 Test date:    May 11, 2026
 ```
-
----
-
-## How to Re-run Tests
-
-Individual module tests can be re-run by copying the test blocks from this document and running them with:
-
-```bash
-cd agents/pm-discovery
-node --input-type=commonjs << 'EOF'
-# paste test code here
-EOF
-```
-
-Full end-to-end test:
-
-```bash
-node agents/pm-discovery/index.js --app "Todoist" --competitors "TickTick,Any.do"
-```
-
----
-
-*All tests passed. Agent is production-ready.*

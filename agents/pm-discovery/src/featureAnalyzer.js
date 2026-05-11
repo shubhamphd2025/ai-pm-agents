@@ -102,7 +102,7 @@ Return ONLY the JSON object, no other text.`;
   try {
     return JSON.parse(jsonStr);
   } catch (e) {
-    console.error('[Feature Comparison] Failed to parse LLM response:', raw);
+    console.error('[Feature Comparison] Failed to parse LLM response:', jsonStr);
     return { gaps: [], uniqueToTarget: [], parity: [] };
   }
 }
