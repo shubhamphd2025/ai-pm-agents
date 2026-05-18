@@ -90,7 +90,7 @@ Be specific and actionable. Avoid vague statements like "users want better perfo
 
 Return ONLY the JSON object, no other text.`;
 
-  const response = await chat(prompt, 2000);
+  const response = await chat(prompt, 3000);
   const jsonStr = extractJSON(response);
 
   try {

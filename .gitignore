@@ -25,6 +25,9 @@ agents/pm-discovery/outputs/
 *.swp
 *.swo
 
+# Tooling metadata
+.gworkspace-mcp/
+
 # Logs
 logs/
 *.log

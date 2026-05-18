@@ -55,7 +55,11 @@ async function chat(prompt, maxTokens = 1500, retries = 3) {
           console.log(`  ℹ️  Used fallback model: ${model}`);
         }
 
-        return response.choices[0].message.content.trim();
+        const content = response.choices[0].message.content;
+        if (content == null) {
+          throw new Error('Empty choices in LLM response');
+        }
+        return content.trim();
       } catch (err) {
         const isRetryable =
           err.status === 429 ||
@@ -88,6 +92,7 @@ async function chat(prompt, maxTokens = 1500, retries = 3) {
 /**
  * Strip markdown code fences and trailing text from LLM JSON responses.
  * Some models append explanatory text after the closing brace/bracket.
+ * Also handles truncated responses by finding the outermost complete JSON structure.
  */
 function extractJSON(raw) {
   let cleaned = raw
@@ -96,10 +101,49 @@ function extractJSON(raw) {
     .replace(/```\s*$/i, '')
     .trim();
 
-  // Trim any trailing text after the last } or ]
+  // Find the start of the JSON (first { or [)
+  const firstBrace = cleaned.indexOf('{');
+  const firstBracket = cleaned.indexOf('[');
+  let start = -1;
+  let isArray = false;
+
+  if (firstBrace === -1 && firstBracket === -1) return cleaned;
+
+  if (firstBrace === -1) { start = firstBracket; isArray = true; }
+  else if (firstBracket === -1) { start = firstBrace; isArray = false; }
+  else if (firstBracket < firstBrace) { start = firstBracket; isArray = true; }
+  else { start = firstBrace; isArray = false; }
+
+  const openChar = isArray ? '[' : '{';
+  const closeChar = isArray ? ']' : '}';
+
+  // Walk forward tracking depth to find the matching close
+  let depth = 0;
+  let inString = false;
+  let escape = false;
+  let end = -1;
+
+  for (let i = start; i < cleaned.length; i++) {
+    const ch = cleaned[i];
+    if (escape) { escape = false; continue; }
+    if (ch === '\\' && inString) { escape = true; continue; }
+    if (ch === '"') { inString = !inString; continue; }
+    if (inString) continue;
+    if (ch === openChar) depth++;
+    else if (ch === closeChar) {
+      depth--;
+      if (depth === 0) { end = i; break; }
+    }
+  }
+
+  if (end !== -1) {
+    return cleaned.substring(start, end + 1);
+  }
+
+  // Truncated response — trim to last complete top-level value
   const lastBrace = Math.max(cleaned.lastIndexOf('}'), cleaned.lastIndexOf(']'));
-  if (lastBrace !== -1 && lastBrace < cleaned.length - 1) {
-    cleaned = cleaned.substring(0, lastBrace + 1);
+  if (lastBrace !== -1) {
+    return cleaned.substring(start, lastBrace + 1);
   }
 
   return cleaned;
