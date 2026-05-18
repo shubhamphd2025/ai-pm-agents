@@ -47,14 +47,23 @@ cp .env.example .env
 
 Open `.env` and fill in:
 
+**Required — the agent won't run without this:**
+
 | Variable | Where to get it |
 |---|---|
 | `OPENROUTER_API_KEY` | [openrouter.ai](https://openrouter.ai/) — Keys → Create Key |
-| `CONFLUENCE_BASE_URL` | Your Atlassian domain, e.g. `https://company.atlassian.net` |
+
+**Optional — needed only if you want to publish to Confluence:**
+
+| Variable | Where to get it |
+|---|---|
+| `CONFLUENCE_BASE_URL` | Your Atlassian domain, e.g. `https://yourcompany.atlassian.net` |
 | `CONFLUENCE_EMAIL` | Your Atlassian account email |
 | `CONFLUENCE_API_TOKEN` | [id.atlassian.com/manage-profile/security/api-tokens](https://id.atlassian.com/manage-profile/security/api-tokens) |
-| `CONFLUENCE_SPACE_KEY` | Confluence → Space Settings → Space Details |
-| `CONFLUENCE_PARENT_PAGE_ID` | The number in the URL of your "Assistant PM — Discovery" page |
+| `CONFLUENCE_SPACE_KEY` | Confluence → Space Settings → Space Details → Space Key |
+| `CONFLUENCE_PARENT_PAGE_ID` | The number in the URL of your parent page, e.g. `/pages/12345678/` |
+
+> **No Confluence?** If you skip the Confluence variables (or they're wrong), the agent automatically saves the report as a Markdown file in `agents/pm-discovery/outputs/`. No extra setup needed.
 
 ### Validate the setup
 
@@ -67,8 +76,12 @@ async function check() {
   const llm = new OpenAI({ baseURL: 'https://openrouter.ai/api/v1', apiKey: process.env.OPENROUTER_API_KEY });
   const r = await llm.chat.completions.create({ model: process.env.OPENROUTER_MODEL, max_tokens: 10, messages: [{ role: 'user', content: 'Say OK' }] });
   console.log('OpenRouter:', r.choices[0].message.content.trim());
-  const c = await axios.get(process.env.CONFLUENCE_BASE_URL + '/wiki/rest/api/content/' + process.env.CONFLUENCE_PARENT_PAGE_ID, { auth: { username: process.env.CONFLUENCE_EMAIL, password: process.env.CONFLUENCE_API_TOKEN } });
-  console.log('Confluence:', c.data.title);
+  if (process.env.CONFLUENCE_BASE_URL && process.env.CONFLUENCE_PARENT_PAGE_ID) {
+    const c = await axios.get(process.env.CONFLUENCE_BASE_URL + '/wiki/rest/api/content/' + process.env.CONFLUENCE_PARENT_PAGE_ID, { auth: { username: process.env.CONFLUENCE_EMAIL, password: process.env.CONFLUENCE_API_TOKEN } });
+    console.log('Confluence:', c.data.title);
+  } else {
+    console.log('Confluence: skipped (not configured — output will be saved as Markdown)');
+  }
 }
 check().catch(e => console.error('Error:', e.message));
 EOF
@@ -107,7 +120,19 @@ You can also trigger the agent from Kiro chat:
 
 ## 4. Understanding the Output
 
-The Confluence document contains:
+The output is published to Confluence **or** saved as a local Markdown file if Confluence isn't configured.
+
+**Confluence output location:**
+```
+Agents > Assistant PM — Discovery > Discovery: [App Name] — [Date]
+```
+
+**Local Markdown fallback location:**
+```
+agents/pm-discovery/outputs/discovery-[app-name]-[YYYY-MM-DD].md
+```
+
+Both formats contain the same content:
 
 **Executive Summary** — 3-4 sentence overview of key findings.
 
@@ -149,8 +174,9 @@ The Confluence document contains:
 | "All LLM models failed" | Wait 5 minutes and retry; check OpenRouter balance at openrouter.ai/credits |
 | Confluence 401 | Regenerate your API token |
 | Confluence 404 | Confirm the parent page ID in the Confluence URL |
-| "Missing required environment variables" | Check that `.env` exists and all fields are filled |
+| "Missing required environment variables" | Check that `.env` exists and `OPENROUTER_API_KEY` is filled in |
 | Empty or malformed Confluence page | Set `DEBUG=true` in `.env` and re-run to see full error traces |
+| Confluence publish fails at runtime | The agent automatically falls back to saving a `.md` file in `outputs/` — check the console for the file path |
 
 ---
 

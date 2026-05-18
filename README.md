@@ -19,7 +19,7 @@ See [GUIDE.md](./GUIDE.md) for setup and usage instructions.
 
 - Node.js v18+
 - [OpenRouter](https://openrouter.ai/) API key
-- Confluence API token
+- Confluence API token _(optional — output falls back to a local `.md` file if not configured)_
 
 ## Repository Structure
 

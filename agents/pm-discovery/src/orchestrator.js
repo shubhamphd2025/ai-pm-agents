@@ -10,7 +10,7 @@ const { analyzeSentiment, computeRatingDistribution } = require('./sentimentAnal
 const { findCompetitors, mergeCompetitors } = require('./competitorFinder');
 const { extractFeatures, compareFeatures } = require('./featureAnalyzer');
 const { analyzeASO, compareASO } = require('./asoAnalyzer');
-const { publishToConfluence } = require('./confluencePublisher');
+const { publishToConfluence, saveAsMarkdown } = require('./confluencePublisher');
 
 /**
  * Pull data for a single app from both stores in parallel.
@@ -135,6 +135,19 @@ Return ONLY the JSON array, no other text.`;
 }
 
 /**
+ * Check whether all required Confluence env vars are present.
+ */
+function isConfluenceConfigured() {
+  return !!(
+    process.env.CONFLUENCE_BASE_URL &&
+    process.env.CONFLUENCE_EMAIL &&
+    process.env.CONFLUENCE_API_TOKEN &&
+    process.env.CONFLUENCE_SPACE_KEY &&
+    process.env.CONFLUENCE_PARENT_PAGE_ID
+  );
+}
+
+/**
  * Run the full discovery analysis pipeline.
  *
  * @param {string} targetAppName - The primary app to analyze
@@ -220,8 +233,7 @@ async function runDiscovery({ targetAppName, competitorNames = [], confluencePar
   targetAnalysis.executiveSummary = executiveSummary;
   targetAnalysis.strategicRecommendations = strategicRecommendations;
 
-  // Step 7: Publish to Confluence
-  console.log('[orchestrator] Publishing to Confluence...');
+  // Step 7: Publish to Confluence, or fall back to a local Markdown file
   const analysisData = {
     targetApp: targetAnalysis,
     competitors: competitorAnalyses,
@@ -231,11 +243,26 @@ async function runDiscovery({ targetAppName, competitorNames = [], confluencePar
     generatedAt: new Date().toISOString(),
   };
 
-  const page = await publishToConfluence(analysisData, confluenceParentPageId);
+  if (!isConfluenceConfigured()) {
+    console.log('[orchestrator] Confluence not configured — saving output as a local Markdown file...');
+    const filePath = saveAsMarkdown(analysisData);
+    console.log(`[orchestrator] Done. Output saved to: ${filePath}`);
+    return { analysisData, markdownPath: filePath };
+  }
 
-  console.log(`[orchestrator] Done. Confluence: ${page._links?.webui || page.url || 'published'}`);
+  console.log('[orchestrator] Publishing to Confluence...');
+  let confluencePage = null;
+  try {
+    confluencePage = await publishToConfluence(analysisData, confluenceParentPageId);
+    console.log(`[orchestrator] Done. Confluence: ${confluencePage._links?.webui || confluencePage.url || 'published'}`);
+  } catch (err) {
+    console.warn(`[orchestrator] Confluence publish failed (${err.message}) — saving output as a local Markdown file instead...`);
+    const filePath = saveAsMarkdown(analysisData);
+    console.log(`[orchestrator] Done. Output saved to: ${filePath}`);
+    return { analysisData, markdownPath: filePath };
+  }
 
-  return { analysisData, confluencePage: page };
+  return { analysisData, confluencePage };
 }
 
 module.exports = { runDiscovery };

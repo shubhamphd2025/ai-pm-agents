@@ -1,9 +1,12 @@
 /**
  * Confluence Publisher module
- * Formats analysis data and publishes structured discovery documents
+ * Formats analysis data and publishes structured discovery documents.
+ * Falls back to saving a local .md file if Confluence is not configured or unreachable.
  */
 
 const axios = require('axios');
+const fs = require('fs');
+const path = require('path');
 require('dotenv').config();
 
 const CONFLUENCE_BASE_URL = process.env.CONFLUENCE_BASE_URL;
@@ -351,4 +354,151 @@ async function publishToConfluence(analysisData, parentPageId) {
   return response.data;
 }
 
-module.exports = { publishToConfluence, buildPageContent };
+/**
+ * Build the discovery document as plain Markdown.
+ * Used as a fallback when Confluence is not configured or unreachable.
+ */
+function buildMarkdownContent(analysisData) {
+  const { targetApp, competitors, featureGaps, asoAnalysis, asoComparison, generatedAt } = analysisData;
+  const allApps = [targetApp, ...competitors];
+  const date = new Date(generatedAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+
+  let md = `# App Discovery: ${targetApp.name}\n\n`;
+  md += `_Generated ${date} by Assistant PM — Discovery_\n\n---\n\n`;
+
+  // Executive Summary
+  md += `## Executive Summary\n\n${targetApp.executiveSummary || 'Analysis complete. See sections below for detailed findings.'}\n\n---\n\n`;
+
+  // App Overview
+  md += `## App Overview\n\n`;
+  md += `| Field | ${allApps.map((a) => a.name).join(' | ')} |\n`;
+  md += `| --- | ${allApps.map(() => '---').join(' | ')} |\n`;
+  md += `| Developer | ${allApps.map((a) => a.ios?.details?.developer || a.android?.details?.developer || 'N/A').join(' | ')} |\n`;
+  md += `| Category | ${allApps.map((a) => a.ios?.details?.primaryGenre || a.android?.details?.genre || 'N/A').join(' | ')} |\n`;
+  md += `| iOS Rating | ${allApps.map((a) => a.ios ? `${a.ios.details.score?.toFixed(1) || 'N/A'}/5` : 'N/A').join(' | ')} |\n`;
+  md += `| Android Rating | ${allApps.map((a) => a.android ? `${a.android.details.score?.toFixed(1) || 'N/A'}/5` : 'N/A').join(' | ')} |\n`;
+  md += `| iOS Reviews | ${allApps.map((a) => a.ios ? formatNumber(a.ios.details.ratings) : 'N/A').join(' | ')} |\n`;
+  md += `| Android Installs | ${allApps.map((a) => a.android?.details?.installs || 'N/A').join(' | ')} |\n`;
+  md += `| Price | ${allApps.map((a) => (a.ios?.details?.free || a.android?.details?.free) ? 'Free' : `$${a.ios?.details?.price || a.android?.details?.price || '?'}`).join(' | ')} |\n`;
+  md += `| Last Updated | ${allApps.map((a) => a.ios?.details?.updated || a.android?.details?.updated || 'N/A').join(' | ')} |\n`;
+  md += `\n---\n\n`;
+
+  // User Sentiment
+  md += `## User Sentiment\n\n`;
+  for (const app of allApps) {
+    const s = app.sentiment;
+    if (!s) continue;
+    md += `### ${app.name}\n\n`;
+    md += `**Sentiment:** ${s.overallSentiment || 'N/A'} | **Score:** ${s.sentimentScore || 'N/A'}/10\n\n`;
+    md += `**What Users Love:**\n${(s.loves || []).map((l) => `- ${l}`).join('\n')}\n\n`;
+    md += `**What Users Hate:**\n${(s.hates || []).map((h) => `- ${h}`).join('\n')}\n\n`;
+    md += `**Feature Requests:**\n${(s.featureRequests || []).map((f) => `- ${f}`).join('\n')}\n\n`;
+    md += `**Reported Bugs:**\n${(s.bugs || []).map((b) => `- ${b}`).join('\n')}\n\n`;
+    if (s.notableQuotes?.length > 0) {
+      md += `**Notable Quotes:**\n${s.notableQuotes.map((q) => `> "${q}"`).join('\n')}\n\n`;
+    }
+  }
+  md += `---\n\n`;
+
+  // Rating Distribution
+  md += `## Rating Distribution\n\n`;
+  for (const app of allApps) {
+    const iosHist = app.ios?.ratingDistribution;
+    const androidHist = app.android?.ratingDistribution;
+    if (!iosHist && !androidHist) continue;
+    md += `### ${app.name}\n\n`;
+    const headers = ['Stars', ...(iosHist ? ['iOS Count', 'iOS %'] : []), ...(androidHist ? ['Android Count', 'Android %'] : [])];
+    md += `| ${headers.join(' | ')} |\n`;
+    md += `| ${headers.map(() => '---').join(' | ')} |\n`;
+    for (let star = 5; star >= 1; star--) {
+      let row = `| ${'★'.repeat(star)} |`;
+      if (iosHist) {
+        const d = iosHist[star] || { count: 0, percentage: '0.0' };
+        row += ` ${formatNumber(d.count)} | ${d.percentage}% |`;
+      }
+      if (androidHist) {
+        const d = androidHist[star] || { count: 0, percentage: '0.0' };
+        row += ` ${formatNumber(d.count)} | ${d.percentage}% |`;
+      }
+      md += `${row}\n`;
+    }
+    md += `\n`;
+  }
+  md += `---\n\n`;
+
+  // Feature Comparison
+  md += `## Feature Comparison\n\n`;
+  if (allApps[0]?.features?.length > 0) {
+    const allFeatureNames = new Set();
+    for (const app of allApps) (app.features || []).forEach((f) => allFeatureNames.add(f.feature));
+    md += `| Feature | ${allApps.map((a) => a.name).join(' | ')} |\n`;
+    md += `| --- | ${allApps.map(() => '---').join(' | ')} |\n`;
+    for (const featureName of allFeatureNames) {
+      md += `| **${featureName}** | ${allApps.map((a) => (a.features || []).some((f) => f.feature === featureName) ? '✅' : '❌').join(' | ')} |\n`;
+    }
+    md += `\n`;
+  }
+  if (featureGaps?.gaps?.length > 0) {
+    md += `### Feature Gaps (missing from ${targetApp.name})\n\n`;
+    md += `| Missing Feature | Present In | Impact | Why It Matters |\n`;
+    md += `| --- | --- | --- | --- |\n`;
+    for (const gap of featureGaps.gaps) {
+      md += `| **${gap.feature}** | ${(gap.presentIn || []).join(', ')} | ${gap.impact} | ${gap.reasoning} |\n`;
+    }
+    md += `\n`;
+  }
+  if (featureGaps?.uniqueToTarget?.length > 0) {
+    md += `### Unique Advantages of ${targetApp.name}\n\n`;
+    for (const u of featureGaps.uniqueToTarget) md += `- **${u.feature}**: ${u.advantage}\n`;
+    md += `\n`;
+  }
+  md += `---\n\n`;
+
+  // ASO Analysis
+  md += `## ASO & Keyword Analysis\n\n`;
+  if (asoAnalysis) {
+    md += `**Overall ASO Score:** ${asoAnalysis.overallASOScore || 'N/A'}/10\n\n`;
+    md += `### Top Keywords\n\n| Keyword | Relevance | In Title | In Description |\n| --- | --- | --- | --- |\n`;
+    for (const k of asoAnalysis.topKeywords || []) {
+      md += `| ${k.keyword} | ${k.relevance} | ${k.inTitle ? '✅' : '❌'} | ${k.inDescription ? '✅' : '❌'} |\n`;
+    }
+    md += `\n### Quick Wins\n\n${(asoAnalysis.quickWins || []).map((w) => `- ${w}`).join('\n')}\n\n`;
+  }
+  if (asoComparison) {
+    md += `### Competitive ASO Comparison\n\n| App | ASO Strength | Key Advantage |\n| --- | --- | --- |\n`;
+    for (const r of asoComparison.rankings || []) {
+      md += `| ${r.appName} | ${r.asoStrength} | ${r.keyAdvantage} |\n`;
+    }
+    md += `\n### Strategic ASO Recommendations\n\n${(asoComparison.recommendations || []).map((r) => `- ${r}`).join('\n')}\n\n`;
+  }
+  md += `---\n\n`;
+
+  // Strategic Recommendations
+  if (targetApp.strategicRecommendations?.length > 0) {
+    md += `## Strategic Recommendations\n\n${targetApp.strategicRecommendations.map((r) => `- ${r}`).join('\n')}\n\n---\n\n`;
+  }
+
+  md += `_Data sourced from Google Play Store and Apple App Store. Generated: ${new Date(generatedAt).toISOString()}_\n`;
+  return md;
+}
+
+/**
+ * Save the discovery document as a local Markdown file inside outputs/.
+ * Returns the absolute file path.
+ */
+function saveAsMarkdown(analysisData) {
+  const appName = analysisData.targetApp.name.replace(/[^a-z0-9]/gi, '-').toLowerCase();
+  const dateStr = new Date(analysisData.generatedAt)
+    .toISOString()
+    .slice(0, 10); // YYYY-MM-DD
+
+  const outputDir = path.resolve(__dirname, '..', 'outputs');
+  if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir, { recursive: true });
+
+  const fileName = `discovery-${appName}-${dateStr}.md`;
+  const filePath = path.join(outputDir, fileName);
+  fs.writeFileSync(filePath, buildMarkdownContent(analysisData), 'utf8');
+  return filePath;
+}
+
+module.exports = { publishToConfluence, buildPageContent, buildMarkdownContent, saveAsMarkdown };

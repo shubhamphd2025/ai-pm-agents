@@ -35,21 +35,28 @@ function parseArgs() {
 
 // ── Validate environment ─────────────────────────────────────────────────────
 function validateEnv() {
-  const required = [
-    'OPENROUTER_API_KEY',
-    'CONFLUENCE_BASE_URL',
-    'CONFLUENCE_EMAIL',
-    'CONFLUENCE_API_TOKEN',
-    'CONFLUENCE_SPACE_KEY',
-    'CONFLUENCE_PARENT_PAGE_ID',
-  ];
-
+  // Only OPENROUTER_API_KEY is strictly required to run the analysis.
+  // Confluence vars are optional — if missing, output is saved as a local .md file.
+  const required = ['OPENROUTER_API_KEY'];
   const missing = required.filter((key) => !process.env[key]);
 
   if (missing.length > 0) {
     console.error(`\nMissing required environment variables:\n  ${missing.join('\n  ')}`);
     console.error(`\nCopy .env.example to .env and fill in the values.\n`);
     process.exit(1);
+  }
+
+  const confluenceVars = [
+    'CONFLUENCE_BASE_URL',
+    'CONFLUENCE_EMAIL',
+    'CONFLUENCE_API_TOKEN',
+    'CONFLUENCE_SPACE_KEY',
+    'CONFLUENCE_PARENT_PAGE_ID',
+  ];
+  const missingConfluence = confluenceVars.filter((key) => !process.env[key]);
+  if (missingConfluence.length > 0) {
+    console.warn(`\n[info] Confluence not fully configured (missing: ${missingConfluence.join(', ')})`);
+    console.warn(`[info] Output will be saved as a local Markdown file in outputs/ instead.\n`);
   }
 }
 
@@ -65,11 +72,17 @@ async function main() {
   }
 
   try {
-    await runDiscovery({
+    const result = await runDiscovery({
       targetAppName: args.app,
       competitorNames: args.competitors || [],
       confluenceParentPageId: args.parentPageId || process.env.CONFLUENCE_PARENT_PAGE_ID,
     });
+
+    if (result.markdownPath) {
+      console.log(`\n✅ Analysis complete. Report saved to:\n   ${result.markdownPath}\n`);
+    } else {
+      console.log(`\n✅ Analysis complete. Published to Confluence.\n`);
+    }
   } catch (err) {
     console.error(`\nAnalysis failed: ${err.message}`);
     if (process.env.DEBUG === 'true') console.error(err.stack);
